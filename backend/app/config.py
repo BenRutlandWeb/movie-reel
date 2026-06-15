@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     scheduler_enabled: bool = True
     provider_refresh_hour: int = 2
     metadata_rescan_hour: int = 3
+    metadata_fetch_delay_seconds: float = 1.0
 
     class Config:
         env_file = ".env"

@@ -14,7 +14,7 @@ A lightweight, self-hosted app for browsing your **physical** movie and TV show 
 
 ## Quick start
 
-Get a free TMDB key at [themoviedb.org/settings/api](https://www.themoviedb.org/settings/api).
+Get a free TMDB key at [themoviedb.org/settings/api](https://www.themoviedb.org/settings/api), or set it in the app under **Settings → TMDB API** (no `.env` required).
 
 ### Run from published image (no clone)
 
@@ -119,12 +119,12 @@ The Vite dev server proxies `/api` to `http://localhost:8000`.
 
 | Variable        | Default              | Description                    |
 |----------------|----------------------|--------------------------------|
-| `TMDB_API_KEY` | (empty)              | TMDB API key for metadata      |
+| `TMDB_API_KEY` | (empty)              | TMDB API key (optional if set in app Settings) |
 | `TMDB_REGION`  | `US`                 | Region for streaming providers |
 | `DATABASE_PATH`| `/data/movie-reel.db` | SQLite database path           |
 | `IMAGES_PATH`  | `/data/images`       | Cached image storage           |
 
-Without a TMDB key, you can still import stubs and browse titles — metadata and streaming info won't be fetched until you add a key and refresh items.
+Without a TMDB key, you can still import stubs and browse titles — add a key in Settings (or via `TMDB_API_KEY`) and metadata will be fetched automatically.
 
 ## API overview
 

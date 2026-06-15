@@ -6,6 +6,7 @@ const JOB_LABELS = {
   provider_refresh: 'Refreshing providers',
   metadata_rescan: 'Rescanning metadata',
   single_metadata: 'Refreshing metadata',
+  image_download: 'Caching images',
 }
 
 export default function JobStatusBanner() {
@@ -28,7 +29,7 @@ export default function JobStatusBanner() {
           <span className="job-status-banner__current">{status.current_item}</span>
         )}
       </span>
-      <Link to="/settings" className="job-status-banner__link">
+      <Link to="/jobs" className="job-status-banner__link">
         View details
       </Link>
     </div>

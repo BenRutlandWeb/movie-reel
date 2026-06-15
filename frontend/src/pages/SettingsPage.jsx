@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
+  deleteCollection,
   exportCollection,
+  fetchAppSettings,
   fetchMetadataErrors,
   fetchProviders,
   importStubs,
@@ -10,13 +12,16 @@ import {
   resolveMetadataError,
   retryMetadata,
   searchTmdb,
+  updateAppSettings,
 } from '../api'
+import ConfirmDialog from '../components/ConfirmDialog'
 import { isJobActive, useJobStatus } from '../hooks/useJobStatus'
 import { getSelectedStreamers, setSelectedStreamers } from '../utils/streamerPrefs'
 
 const ERROR_LABELS = {
   search_miss: 'No TMDB match',
   tmdb_error: 'TMDB fetch failed',
+  network: 'Network error',
   unknown: 'Unknown error',
   config: 'Not configured',
 }
@@ -26,6 +31,7 @@ const JOB_LABELS = {
   provider_refresh: 'Refreshing providers',
   metadata_rescan: 'Rescanning metadata',
   single_metadata: 'Refreshing metadata',
+  image_download: 'Caching images',
 }
 
 function normalizeImportItems(data) {
@@ -57,6 +63,21 @@ export default function SettingsPage({ onImport }) {
   const [errorsLoading, setErrorsLoading] = useState(true)
   const [fixingId, setFixingId] = useState(null)
   const [fixResults, setFixResults] = useState({})
+  const [appSettings, setAppSettings] = useState(null)
+  const [tmdbKeyInput, setTmdbKeyInput] = useState('')
+  const [tmdbRegionInput, setTmdbRegionInput] = useState('US')
+  const [savingTmdb, setSavingTmdb] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [deletingCollection, setDeletingCollection] = useState(false)
+
+  const loadAppSettings = useCallback(() => {
+    return fetchAppSettings()
+      .then((data) => {
+        setAppSettings(data)
+        setTmdbRegionInput(data.tmdb_region || 'US')
+      })
+      .catch(console.error)
+  }, [])
 
   const loadErrors = useCallback(() => {
     setErrorsLoading(true)
@@ -85,8 +106,9 @@ export default function SettingsPage({ onImport }) {
   useEffect(() => {
     loadProviders()
     loadErrors()
+    loadAppSettings()
     refreshStatus()
-  }, [loadErrors, refreshStatus])
+  }, [loadErrors, loadAppSettings, refreshStatus])
 
   const jobActive = isJobActive(status)
 
@@ -206,6 +228,54 @@ export default function SettingsPage({ onImport }) {
     }
   }
 
+  async function handleSaveTmdb(e) {
+    e.preventDefault()
+    setError(null)
+    setSavingTmdb(true)
+    try {
+      const payload = { tmdbRegion: tmdbRegionInput.trim().toUpperCase() }
+      if (tmdbKeyInput.trim()) {
+        payload.tmdbApiKey = tmdbKeyInput.trim()
+      }
+      const result = await updateAppSettings(payload)
+      setAppSettings(result)
+      setTmdbKeyInput('')
+      if (result.metadata_queued) {
+        setStatus({
+          running: true,
+          total: result.metadata_total,
+          completed: 0,
+          failed: 0,
+          job_type: 'metadata_import',
+        })
+        alert(
+          `TMDB settings saved. Fetching metadata for ${result.metadata_total} titles in the background.`,
+        )
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to save TMDB settings')
+    } finally {
+      setSavingTmdb(false)
+    }
+  }
+
+  async function handleClearTmdbKey() {
+    if (!window.confirm('Remove the saved TMDB API key? Metadata fetching will stop unless a key is set in the environment.')) {
+      return
+    }
+    setError(null)
+    setSavingTmdb(true)
+    try {
+      const result = await updateAppSettings({ tmdbApiKey: '', queuePendingMetadata: false })
+      setAppSettings(result)
+      setTmdbKeyInput('')
+    } catch (err) {
+      setError(err.message || 'Failed to clear TMDB key')
+    } finally {
+      setSavingTmdb(false)
+    }
+  }
+
   async function handleExport() {
     setError(null)
     const data = await exportCollection()
@@ -216,6 +286,30 @@ export default function SettingsPage({ onImport }) {
     a.download = `movie-reel-export-${new Date().toISOString().slice(0, 10)}.json`
     a.click()
     URL.revokeObjectURL(url)
+  }
+
+  async function handleDeleteCollection() {
+    setError(null)
+    setDeletingCollection(true)
+    try {
+      const result = await deleteCollection()
+      setShowDeleteDialog(false)
+      setProviders([])
+      setSelectedIds([])
+      setMetadataErrors([])
+      setFixResults({})
+      await refreshStatus()
+      onImport?.()
+      alert(
+        result.deleted > 0
+          ? `Removed ${result.deleted} titles from your collection.`
+          : 'Your collection was already empty.',
+      )
+    } catch (err) {
+      setError(err.message || 'Failed to delete collection')
+    } finally {
+      setDeletingCollection(false)
+    }
   }
 
   async function handleImport(e) {
@@ -230,7 +324,7 @@ export default function SettingsPage({ onImport }) {
       const text = await file.text()
       const data = JSON.parse(text)
       const items = normalizeImportItems(data)
-      const result = await importStubs(items, data.fetch_metadata ?? true)
+      const result = await importStubs(items, true)
       if (result.metadata_queued) {
         setStatus({
           running: true,
@@ -243,7 +337,16 @@ export default function SettingsPage({ onImport }) {
           `Imported ${result.imported} titles. Fetching metadata in the background — this may take a while.`,
         )
       } else {
-        alert(`Imported ${result.imported} items successfully.`)
+        const msg = result.imported > 0
+          ? `Imported ${result.imported} titles.`
+          : `Imported ${result.imported} items successfully.`
+        if (!result.metadata_queued && result.imported > 0) {
+          alert(
+            `${msg} Add a TMDB API key in Settings to fetch metadata.`,
+          )
+        } else {
+          alert(msg)
+        }
         onImport?.()
       }
     } catch (err) {
@@ -260,6 +363,65 @@ export default function SettingsPage({ onImport }) {
       <h1 className="page-title">Settings</h1>
 
       {error && <p className="settings-error">{error}</p>}
+
+      <div className="section">
+        <h2>TMDB API</h2>
+        <p className="overview" style={{ marginBottom: '1rem' }}>
+          Metadata, posters, cast, and streaming availability come from{' '}
+          <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noreferrer">
+            TMDB
+          </a>
+          . Set your API key here — no server restart or <code>.env</code> file required.
+        </p>
+        {appSettings && (
+          <p className="overview tmdb-status" style={{ marginBottom: '1rem', fontSize: '0.85rem' }}>
+            Status:{' '}
+            <span className={appSettings.tmdb_configured ? 'tmdb-status__ok' : 'tmdb-status__missing'}>
+              {appSettings.tmdb_configured ? 'Configured' : 'Not configured'}
+            </span>
+            {appSettings.tmdb_api_key_preview && (
+              <> · Key: {appSettings.tmdb_api_key_preview}</>
+            )}
+            {appSettings.tmdb_key_source === 'environment' && (
+              <> · Using key from environment variable</>
+            )}
+          </p>
+        )}
+        <form className="tmdb-settings-form" onSubmit={handleSaveTmdb}>
+          <label className="tmdb-settings-form__field">
+            <span>API key</span>
+            <input
+              type="password"
+              className="search-input"
+              value={tmdbKeyInput}
+              onChange={(e) => setTmdbKeyInput(e.target.value)}
+              placeholder={appSettings?.tmdb_configured ? 'Enter new key to replace' : 'Paste your TMDB API key'}
+              autoComplete="off"
+            />
+          </label>
+          <label className="tmdb-settings-form__field">
+            <span>Region</span>
+            <input
+              type="text"
+              className="search-input tmdb-settings-form__region"
+              value={tmdbRegionInput}
+              onChange={(e) => setTmdbRegionInput(e.target.value.toUpperCase())}
+              placeholder="US"
+              maxLength={2}
+            />
+          </label>
+          <div className="tmdb-settings-form__actions">
+            <button type="submit" className="btn-primary" disabled={savingTmdb}>
+              {savingTmdb ? 'Saving…' : 'Save TMDB settings'}
+            </button>
+            {appSettings?.tmdb_key_source === 'database' && appSettings.tmdb_configured && (
+              <button type="button" className="job-actions__btn" disabled={savingTmdb} onClick={handleClearTmdbKey}>
+                Remove saved key
+              </button>
+            )}
+          </div>
+        </form>
+      </div>
 
       {isJobActive(status) && (
         <div className="settings-panel">
@@ -488,6 +650,33 @@ export default function SettingsPage({ onImport }) {
           {importing ? 'Importing…' : 'Import JSON'}
         </button>
       </div>
+
+      <div className="section danger-zone">
+        <h2>Delete collection</h2>
+        <p className="overview" style={{ marginBottom: '1rem' }}>
+          Permanently remove every title, tag, and streaming link from your library.
+          TMDB settings are kept. Export first if you want a backup.
+        </p>
+        <button
+          type="button"
+          className="btn-danger"
+          onClick={() => setShowDeleteDialog(true)}
+        >
+          Delete entire collection
+        </button>
+      </div>
+
+      <ConfirmDialog
+        open={showDeleteDialog}
+        title="Delete entire collection?"
+        message="This permanently removes all movies and TV shows, cast links, genres, tags, and streaming data. This cannot be undone."
+        confirmLabel="Delete collection"
+        cancelLabel="Keep collection"
+        danger
+        loading={deletingCollection}
+        onConfirm={handleDeleteCollection}
+        onCancel={() => !deletingCollection && setShowDeleteDialog(false)}
+      />
     </div>
   )
 }

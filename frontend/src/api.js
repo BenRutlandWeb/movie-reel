@@ -1,5 +1,27 @@
 const API = '/api'
 
+export async function fetchAppSettings() {
+  const res = await fetch(`${API}/settings`)
+  if (!res.ok) throw new Error('Failed to fetch settings')
+  return res.json()
+}
+
+export async function updateAppSettings({ tmdbApiKey, tmdbRegion, queuePendingMetadata = true }) {
+  const body = { queue_pending_metadata: queuePendingMetadata }
+  if (tmdbApiKey !== undefined) body.tmdb_api_key = tmdbApiKey
+  if (tmdbRegion !== undefined) body.tmdb_region = tmdbRegion
+  const res = await fetch(`${API}/settings`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    const detail = await res.json().catch(() => ({}))
+    throw new Error(detail.detail || 'Failed to save settings')
+  }
+  return res.json()
+}
+
 export const RECENT_ADDED_DAYS = 30
 
 export async function fetchSearchSuggestions(query, limit = 3) {
@@ -61,6 +83,15 @@ export async function exportCollection() {
   return res.json()
 }
 
+export async function deleteCollection() {
+  const res = await fetch(`${API}/media/collection`, { method: 'DELETE' })
+  if (!res.ok) {
+    const detail = await res.json().catch(() => ({}))
+    throw new Error(detail.detail || 'Failed to delete collection')
+  }
+  return res.json()
+}
+
 export async function importStubs(items, fetchMetadata = true) {
   const res = await fetch(`${API}/media/import`, {
     method: 'POST',
@@ -74,6 +105,42 @@ export async function importStubs(items, fetchMetadata = true) {
   return res.json()
 }
 
+export async function pauseJobs() {
+  const res = await fetch(`${API}/media/jobs/pause`, { method: 'POST' })
+  if (!res.ok) {
+    const detail = await res.json().catch(() => ({}))
+    throw new Error(detail.detail || 'Failed to pause jobs')
+  }
+  return res.json()
+}
+
+export async function resumeJobs() {
+  const res = await fetch(`${API}/media/jobs/resume`, { method: 'POST' })
+  if (!res.ok) {
+    const detail = await res.json().catch(() => ({}))
+    throw new Error(detail.detail || 'Failed to resume jobs')
+  }
+  return res.json()
+}
+
+export async function deleteJob(jobId) {
+  const res = await fetch(`${API}/media/jobs/${jobId}`, { method: 'DELETE' })
+  if (!res.ok) {
+    const detail = await res.json().catch(() => ({}))
+    throw new Error(detail.detail || 'Failed to delete job')
+  }
+  return res.json()
+}
+
+export async function clearJobQueue() {
+  const res = await fetch(`${API}/media/jobs/queue`, { method: 'DELETE' })
+  if (!res.ok) {
+    const detail = await res.json().catch(() => ({}))
+    throw new Error(detail.detail || 'Failed to clear queue')
+  }
+  return res.json()
+}
+
 export async function fetchImportStatus() {
   const res = await fetch(`${API}/media/jobs/status`)
   if (!res.ok) throw new Error('Failed to fetch job status')
@@ -82,6 +149,15 @@ export async function fetchImportStatus() {
 
 export async function fetchJobsStatus() {
   return fetchImportStatus()
+}
+
+export async function retryAllMetadataErrors() {
+  const res = await fetch(`${API}/media/errors/retry-all`, { method: 'POST' })
+  if (!res.ok) {
+    const detail = await res.json().catch(() => ({}))
+    throw new Error(detail.detail || 'Failed to retry errors')
+  }
+  return res.json()
 }
 
 export async function fetchMetadataErrors() {

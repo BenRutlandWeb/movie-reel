@@ -471,6 +471,20 @@ def export_media():
     return build_export()
 
 
+@router.delete("/collection")
+def delete_collection():
+    from app.services.import_jobs import clear_queue
+
+    clear_queue()
+    with get_db() as conn:
+        count = conn.execute("SELECT COUNT(*) FROM media").fetchone()[0]
+        conn.execute("DELETE FROM media")
+        conn.execute("DELETE FROM people")
+        conn.execute("DELETE FROM genres")
+        conn.execute("DELETE FROM tags")
+    return {"deleted": count}
+
+
 @router.post("/export/import")
 async def import_export_data(data: dict):
     items_raw = data.get("items")
@@ -516,13 +530,24 @@ async def import_media(body: ImportRequest):
             imported += 1
 
     metadata_queued = False
-    if body.fetch_metadata and tmdb_client.configured and body.items:
-        metadata_queued = start_metadata_job(stub_ids)
+    metadata_total = 0
+    if body.fetch_metadata and body.items:
+        to_queue: list[tuple] = []
+        with get_db() as conn:
+            for stub, media_id in stub_ids:
+                row = conn.execute(
+                    "SELECT tmdb_id FROM media WHERE id = ?", (media_id,)
+                ).fetchone()
+                if not row["tmdb_id"]:
+                    to_queue.append((stub, media_id))
+        if to_queue and tmdb_client.configured:
+            metadata_queued = start_metadata_job(to_queue)
+            metadata_total = len(to_queue)
 
     return {
         "imported": imported,
         "metadata_queued": metadata_queued,
-        "metadata_total": len(body.items) if metadata_queued else 0,
+        "metadata_total": metadata_total,
     }
 
 
@@ -560,6 +585,28 @@ def list_metadata_errors():
     from app.services.metadata_errors import list_unresolved_errors
 
     return list_unresolved_errors()
+
+
+@router.post("/errors/retry-all")
+async def retry_all_metadata_errors():
+    from app.services.import_jobs import enqueue_single_metadata, get_queue_info
+    from app.services.metadata_errors import list_unresolved_errors
+
+    if not tmdb_client.configured:
+        raise HTTPException(400, "TMDB API key not configured")
+
+    errors = list_unresolved_errors()
+    queued = 0
+    for err in errors:
+        stub = MediaStub(
+            title=err["title"],
+            year=err["year"],
+            media_type=err["media_type"],
+        )
+        if enqueue_single_metadata(stub, err["media_id"]):
+            queued += 1
+
+    return {"queued": queued, "total": len(errors), "queue": get_queue_info()}
 
 
 @router.post("/refresh-providers")
@@ -600,20 +647,55 @@ async def refresh_all_metadata():
 
 @router.get("/jobs/status")
 def jobs_status():
-    from app.services.import_jobs import get_job_status, get_queue_info
+    from app.services.import_jobs import get_job_status, get_queue_info, is_paused
     from app.services.metadata_errors import get_setting
     from app.services.scheduler import get_schedule_info
 
+    queue_info = get_queue_info()
     status = get_job_status()
     if status is None:
         status = {"running": False, "total": 0, "completed": 0, "failed": 0}
     return {
         **status,
-        "queue": get_queue_info(),
+        "paused": is_paused(),
+        "queue": queue_info,
         "schedule": get_schedule_info(),
         "last_provider_refresh": get_setting("last_provider_refresh"),
         "last_metadata_rescan": get_setting("last_metadata_rescan"),
     }
+
+
+@router.post("/jobs/pause")
+def pause_jobs():
+    from app.services.import_jobs import get_queue_info, pause_worker
+
+    pause_worker()
+    return {"paused": True, "queue": get_queue_info()}
+
+
+@router.post("/jobs/resume")
+def resume_jobs():
+    from app.services.import_jobs import get_queue_info, resume_worker
+
+    resume_worker()
+    return {"paused": False, "queue": get_queue_info()}
+
+
+@router.delete("/jobs/queue")
+def clear_job_queue():
+    from app.services.import_jobs import clear_queue, get_queue_info
+
+    removed = clear_queue()
+    return {"cleared": removed, "queue": get_queue_info()}
+
+
+@router.delete("/jobs/{job_id}")
+def delete_job(job_id: int):
+    from app.services.import_jobs import cancel_job, get_queue_info
+
+    if not cancel_job(job_id):
+        raise HTTPException(404, "Job not found")
+    return {"deleted": True, "job_id": job_id, "queue": get_queue_info()}
 
 
 @router.get("/import/status")
@@ -773,6 +855,10 @@ async def get_media(media_id: int):
         owned = result.get("seasons") or []
         if owned:
             result["season_details"] = await _fetch_owned_seasons(media["tmdb_id"], owned)
+
+    from app.services.image_tasks import enqueue_missing_media_images
+
+    enqueue_missing_media_images(media_id)
 
     return result
 

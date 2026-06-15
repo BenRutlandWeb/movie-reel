@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
 from app.database import init_db
-from app.routes import images, media, people, tmdb
+from app.routes import images, media, people, settings as settings_routes, tmdb
 
 app = FastAPI(title=settings.app_name)
 
@@ -23,6 +23,7 @@ app.include_router(media.router)
 app.include_router(people.router)
 app.include_router(images.router)
 app.include_router(tmdb.router)
+app.include_router(settings_routes.router)
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -41,10 +42,12 @@ def startup():
 
 
 @app.on_event("shutdown")
-def shutdown():
+async def shutdown():
+    from app.services.http_client import close_http_client
     from app.services.scheduler import stop_scheduler
 
     stop_scheduler()
+    await close_http_client()
 
 
 @app.get("/api/health")

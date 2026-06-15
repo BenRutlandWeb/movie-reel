@@ -33,3 +33,9 @@ class ExportData(BaseModel):
     app: str = "Movie Reel"
     fetch_metadata: bool = True
     items: list[MediaStub]
+
+
+class UpdateAppSettingsRequest(BaseModel):
+    tmdb_api_key: str | None = None
+    tmdb_region: str | None = None
+    queue_pending_metadata: bool = True

@@ -1597,6 +1597,67 @@ img {
   cursor: not-allowed;
 }
 
+.btn-danger {
+  background: #dc2626;
+  color: #fff;
+  padding: 0.6rem 1.2rem;
+  border-radius: var(--radius);
+  font-weight: 600;
+  line-height: 1.25;
+  border: none;
+}
+
+.btn-danger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.confirm-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.65);
+}
+
+.confirm-dialog {
+  width: min(100%, 420px);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  box-shadow: var(--shadow);
+}
+
+.confirm-dialog__title {
+  font-size: 1.1rem;
+  margin-bottom: 0.75rem;
+}
+
+.confirm-dialog__message {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  margin-bottom: 1.25rem;
+}
+
+.confirm-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.danger-zone {
+  border-color: rgba(220, 38, 38, 0.35);
+}
+
+.danger-zone h2 {
+  color: #f87171;
+}
+
 .import-file-input {
   position: absolute;
   width: 1px;
@@ -1699,4 +1760,173 @@ img {
   border-radius: 4px;
   aspect-ratio: 2/3;
   object-fit: cover;
+}
+
+/* TMDB settings */
+.tmdb-settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.tmdb-settings-form__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+}
+
+.tmdb-settings-form__field span {
+  color: var(--text-muted);
+}
+
+.tmdb-settings-form__region {
+  max-width: 6rem;
+  text-transform: uppercase;
+}
+
+.tmdb-settings-form__actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.tmdb-status__ok {
+  color: var(--tv);
+}
+
+.tmdb-status__missing {
+  color: #e88;
+}
+
+/* Jobs page */
+.jobs-page {
+  max-width: 800px;
+}
+
+.jobs-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.jobs-stat {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem;
+  text-align: center;
+}
+
+.jobs-stat__value {
+  display: block;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.jobs-stat__value--paused {
+  color: #e88;
+  font-size: 1rem;
+}
+
+.jobs-stat__label {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 0.25rem;
+}
+
+.job-queue-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.job-queue-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem 1rem;
+}
+
+.job-queue-item__info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.job-queue-item__meta {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.job-queue-item__delete {
+  background: var(--surface-hover);
+  color: var(--text);
+  padding: 0.35rem 0.75rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.job-queue-item__delete:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.job-progress__header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.job-progress__badge {
+  font-size: 0.75rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+}
+
+.job-progress__badge--running {
+  color: var(--tv);
+  border-color: var(--tv);
+}
+
+.job-progress__badge--queued {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.job-progress__badge--cancelled {
+  color: #e88;
+  border-color: #e88;
+}
+
+.job-progress__current {
+  font-size: 0.85rem;
+}
+
+.job-progress__bar {
+  height: 4px;
+  background: var(--bg);
+  border-radius: 2px;
+  margin-top: 0.75rem;
+  overflow: hidden;
+}
+
+.job-progress__fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.3s ease;
 }

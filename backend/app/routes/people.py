@@ -3,6 +3,7 @@ from fastapi import APIRouter, HTTPException
 from app.database import get_db
 from app.services.images import local_image_url
 from app.services.metadata import fetch_and_store_person_details
+from app.services.image_tasks import enqueue_person_profile
 from app.services.tmdb import tmdb_client
 
 router = APIRouter(prefix="/api/people", tags=["people"])
@@ -51,6 +52,8 @@ async def get_person(person_id: int):
         await fetch_and_store_person_details(person_id)
         with get_db() as conn:
             person = conn.execute("SELECT * FROM people WHERE id = ?", (person_id,)).fetchone()
+    elif person["profile_path"] and not person["profile_local"]:
+        enqueue_person_profile(person_id)
 
     return _person_response(person, media)
 

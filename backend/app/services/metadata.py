@@ -4,7 +4,7 @@ from typing import Any
 
 from app.database import get_db
 from app.schemas import ExportData, MediaStub
-from app.services.images import download_image
+from app.services.image_tasks import enqueue_media_images, enqueue_person_profile, enqueue_provider_logos
 from app.services.tmdb import tmdb_client
 
 
@@ -349,27 +349,6 @@ def _upsert_media(conn, item: dict[str, Any]) -> int:
     return row["id"]
 
 
-async def _cache_images_for_media(media_id: int, item: dict[str, Any]) -> dict[str, str | None]:
-    poster_local = item.get("poster_local")
-    backdrop_local = item.get("backdrop_local")
-
-    if not poster_local and item.get("poster_path"):
-        poster_local = await download_image(
-            item["poster_path"], "posters", f"{media_id}_poster.jpg", "w500"
-        )
-    if not backdrop_local and item.get("backdrop_path"):
-        backdrop_local = await download_image(
-            item["backdrop_path"], "backdrops", f"{media_id}_backdrop.jpg", "w1280"
-        )
-
-    with get_db() as conn:
-        conn.execute(
-            "UPDATE media SET poster_local = ?, backdrop_local = ? WHERE id = ?",
-            (poster_local, backdrop_local, media_id),
-        )
-    return {"poster_local": poster_local, "backdrop_local": backdrop_local}
-
-
 def _link_people_from_tmdb(conn, media_id: int, details: dict, media_type: str) -> list[tuple[int, str | None]]:
     credits = details.get("credits", {})
     crew = credits.get("crew", [])
@@ -453,6 +432,7 @@ def _link_providers_from_tmdb(conn, media_id: int, details: dict) -> list[dict]:
                     "provider_id": provider["provider_id"],
                     "provider_type": provider_type,
                     "logo_path": provider.get("logo_path"),
+                    "provider_name": provider["provider_name"],
                 }
             )
 
@@ -490,60 +470,8 @@ async def fetch_and_store_person_details(person_id: int, *, force: bool = False)
         )
 
     if profile_path and not person["profile_local"]:
-        await _cache_person_profiles([(person_id, profile_path)])
+        enqueue_person_profile(person_id)
 
-
-async def _cache_person_profiles(profiles: list[tuple[int, str | None]]) -> None:
-    updates: list[tuple[str, int]] = []
-    for person_id, profile_path in profiles:
-        if not profile_path:
-            continue
-        local = await download_image(profile_path, "profiles", f"{person_id}_profile.jpg", "w185")
-        if local:
-            updates.append((local, person_id))
-
-    if not updates:
-        return
-
-    with get_db() as conn:
-        conn.executemany("UPDATE people SET profile_local = ? WHERE id = ?", updates)
-
-
-async def _cache_provider_logos(providers: list[dict]) -> None:
-    updates: list[tuple[str, int, int, str, str]] = []
-    for provider in providers:
-        logo_path = provider.get("logo_path")
-        if not logo_path:
-            continue
-        logo_local = await download_image(
-            logo_path,
-            "providers",
-            f"provider_{provider['provider_id']}.png",
-            "w92",
-        )
-        if logo_local:
-            updates.append(
-                (
-                    logo_local,
-                    provider["media_id"],
-                    provider["provider_id"],
-                    provider["provider_type"],
-                    tmdb_client.region,
-                )
-            )
-
-    if not updates:
-        return
-
-    with get_db() as conn:
-        conn.executemany(
-            """
-            UPDATE streaming_providers
-            SET logo_local = ?
-            WHERE media_id = ? AND provider_id = ? AND provider_type = ? AND region = ?
-            """,
-            updates,
-        )
 
 
 async def _store_tmdb_details(
@@ -622,10 +550,8 @@ async def _store_tmdb_details(
             conn.execute("DELETE FROM media_tags WHERE media_id = ?", (media_id,))
             _link_tags(conn, media_id, stub.tags)
 
-    await _cache_person_profiles(profiles)
-    await _cache_provider_logos(pending_providers)
-    cached = await _cache_images_for_media(media_id, result)
-    result.update(cached)
+    title = result["title"]
+    enqueue_media_images(media_id, title, result, profiles, pending_providers)
     result["id"] = media_id
     return result
 
@@ -752,7 +678,7 @@ async def refresh_streaming_providers(media_id: int, tmdb_id: int, media_type: s
         )
         pending_providers = _link_providers_from_tmdb(conn, media_id, details)
 
-    await _cache_provider_logos(pending_providers)
+    enqueue_provider_logos(pending_providers)
 
 
 def build_export() -> ExportData:

@@ -14,6 +14,7 @@ import EpisodePage from './pages/EpisodePage'
 import PersonPage from './pages/PersonPage'
 
 import SettingsPage from './pages/SettingsPage'
+import JobsPage from './pages/JobsPage'
 import AddMediaPage from './pages/AddMediaPage'
 
 
@@ -51,6 +52,8 @@ export default function App() {
           <Route path="/add" element={<AddMediaPage />} />
 
           <Route path="/settings" element={<SettingsPage />} />
+
+          <Route path="/jobs" element={<JobsPage />} />
 
         </Routes>
 

@@ -1,9 +1,14 @@
-import httpx
+import asyncio
+import logging
 
-from app.config import settings
+from app.services.http_client import TRANSIENT_ERRORS, request_with_retry
+from app.services.tmdb_config import get_api_key, get_region
+
+logger = logging.getLogger(__name__)
 
 TMDB_BASE = "https://api.themoviedb.org/3"
 TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p"
+SEARCH_DELAY_SECONDS = 0.35
 
 # Alternate TMDB search queries for titles that differ from folder/library names.
 MOVIE_SEARCH_ALIASES: dict[str, list[str]] = {
@@ -14,9 +19,13 @@ MOVIE_SEARCH_ALIASES: dict[str, list[str]] = {
 
 
 class TMDBClient:
-    def __init__(self) -> None:
-        self.api_key = settings.tmdb_api_key
-        self.region = settings.tmdb_region
+    @property
+    def api_key(self) -> str:
+        return get_api_key()
+
+    @property
+    def region(self) -> str:
+        return get_region()
 
     @property
     def configured(self) -> bool:
@@ -27,11 +36,18 @@ class TMDBClient:
             return None
         params = params or {}
         params["api_key"] = self.api_key
-        async with httpx.AsyncClient(timeout=30) as client:
-            response = await client.get(f"{TMDB_BASE}{path}", params=params)
-            if response.status_code != 200:
-                return None
-            return response.json()
+        try:
+            response = await request_with_retry(
+                "GET",
+                f"{TMDB_BASE}{path}",
+                params=params,
+            )
+        except TRANSIENT_ERRORS as exc:
+            logger.error("TMDB request failed after retries: %s %s", path, exc)
+            raise
+        if response.status_code != 200:
+            return None
+        return response.json()
 
     async def _search_movie_query(self, title: str, year: int | None) -> dict | None:
         params: dict = {"query": title}
@@ -48,11 +64,14 @@ class TMDBClient:
         if aliases:
             queries.extend(alias for alias in aliases if alias not in queries)
 
-        for query in queries:
+        for i, query in enumerate(queries):
+            if i > 0:
+                await asyncio.sleep(SEARCH_DELAY_SECONDS)
             result = await self._search_movie_query(query, year)
             if result:
                 return result
             if year is not None:
+                await asyncio.sleep(SEARCH_DELAY_SECONDS)
                 result = await self._search_movie_query(query, None)
                 if result:
                     return result

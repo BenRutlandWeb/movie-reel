@@ -15,6 +15,19 @@ function PlusIcon() {
   )
 }
 
+function ListIcon() {
+  return (
+    <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+      <line x1="8" y1="6" x2="21" y2="6" />
+      <line x1="8" y1="12" x2="21" y2="12" />
+      <line x1="8" y1="18" x2="21" y2="18" />
+      <line x1="3" y1="6" x2="3.01" y2="6" />
+      <line x1="3" y1="12" x2="3.01" y2="12" />
+      <line x1="3" y1="18" x2="3.01" y2="18" />
+    </svg>
+  )
+}
+
 function CogIcon() {
   return (
     <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -94,6 +107,10 @@ export default function Header() {
               <PlusIcon />
               Add
             </NavLink>
+            <NavLink to="/jobs" className={navClass}>
+              <ListIcon />
+              Jobs
+            </NavLink>
             <NavLink to="/settings" className={navClass}>
               <CogIcon />
               Settings
@@ -143,6 +160,10 @@ export default function Header() {
         <NavLink to="/add" className={navClass} onClick={() => setMenuOpen(false)}>
           <PlusIcon />
           Add
+        </NavLink>
+        <NavLink to="/jobs" className={navClass} onClick={() => setMenuOpen(false)}>
+          <ListIcon />
+          Jobs
         </NavLink>
         <NavLink to="/settings" className={navClass} onClick={() => setMenuOpen(false)}>
           <CogIcon />

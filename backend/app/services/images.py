@@ -1,12 +1,11 @@
 from pathlib import Path
 
-import httpx
-
 from app.config import IMAGES_PATH
+from app.services.http_client import TRANSIENT_ERRORS, request_with_retry
 from app.services.tmdb import TMDB_IMAGE_BASE
 
 
-async def download_image(
+async def download_image_immediate(
     remote_path: str | None,
     category: str,
     filename: str,
@@ -24,13 +23,12 @@ async def download_image(
 
     url = f"{TMDB_IMAGE_BASE}/{size}{remote_path}"
     try:
-        async with httpx.AsyncClient(timeout=60) as client:
-            response = await client.get(url)
-            if response.status_code != 200:
-                return None
-            dest.write_bytes(response.content)
-            return str(dest.relative_to(IMAGES_PATH.parent))
-    except httpx.HTTPError:
+        response = await request_with_retry("GET", url)
+        if response.status_code != 200:
+            return None
+        dest.write_bytes(response.content)
+        return str(dest.relative_to(IMAGES_PATH.parent))
+    except TRANSIENT_ERRORS:
         return None
 
 
