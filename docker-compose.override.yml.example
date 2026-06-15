@@ -1,0 +1,5 @@
+# Local development — copy to docker-compose.override.yml (gitignored).
+# Compose merges this with docker-compose.yml and builds from source.
+services:
+  movie-reel:
+    build: .

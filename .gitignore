@@ -1,0 +1,6 @@
+data/
+.env
+docker-compose.override.yml
+*.db
+test_media/
+node_modules/

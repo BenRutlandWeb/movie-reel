@@ -1,0 +1,14 @@
+services:
+  movie-reel:
+    image: ghcr.io/benrutlandweb/movie-reel:latest
+    container_name: movie-reel
+    ports:
+      - "8080:8000"
+    volumes:
+      - ./data:/data
+    environment:
+      - TMDB_API_KEY=${TMDB_API_KEY:-}
+      - TMDB_REGION=${TMDB_REGION:-GB}
+      - DATABASE_PATH=/data/movie-reel.db
+      - IMAGES_PATH=/data/images
+    restart: unless-stopped
