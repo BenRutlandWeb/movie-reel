@@ -29,7 +29,22 @@ docker compose up -d
 
 Open [http://localhost:8080](http://localhost:8080).
 
+Published images support **linux/amd64** and **linux/arm64** (Raspberry Pi 4/5 and other ARM64 boards). Docker picks the matching architecture automatically.
+
 To pin a release, change the image tag in `docker-compose.yml` (e.g. `ghcr.io/benrutlandweb/movie-reel:v1.0.0`).
+
+### Raspberry Pi (ARM64)
+
+If you see a platform mismatch (`linux/amd64` vs `linux/arm64`), the image on GHCR was built before multi-arch support — pull again after the next publish, or build locally:
+
+```bash
+git clone https://github.com/BenRutlandWeb/movie-reel.git && cd movie-reel
+cp .env.example .env   # add your TMDB_API_KEY
+cp docker-compose.override.yml.example docker-compose.override.yml
+docker compose up -d --build
+```
+
+Local builds use your Pi's native architecture; no `platform:` override is needed.
 
 **First-time publish:** GitHub Actions pushes to `ghcr.io` on every push to `main`/`master` and on version tags (`v1.0.0`, etc.). New GHCR packages are private by default — open the package under your GitHub profile → **Package settings** → **Change visibility** → **Public** so others can pull without logging in.
 
